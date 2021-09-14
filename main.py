@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 from numpy.core.numeric import outer
 from scipy.interpolate import interp1d
 from PIL import Image
+import sys 
 
-N = 1080 
+N = 640 
 variation = int(N*0.1)
 # FROM LOWER TO HIGHER
 sky_colors = {"day": [[132,218,243], [95,208,243], [58,193,242]], 
@@ -19,6 +20,7 @@ earth_color = [[168, 87, 49], [146, 82, 46]]
 outer_sun = [249,255,176]
 transition_height = int(N * 0.1)
 sky_height = int(N*0.15)
+cloud_circles = 10
 # TODO PONER LA CREUETA
 
 def getPoints(lower, upper, pixels=N):
@@ -65,8 +67,6 @@ def drawSun(array, horizon):
                     array[row][column] = sun_color
                 elif euclidean >= radius + 5 and euclidean <= outer_radius:
                     array[row][column] = outer_sun
-                    
-    array[xpos][ypos] = [0,0,0]
 
     return array
 
@@ -101,6 +101,7 @@ def drawSky(array, horizon, time):
             else:
                 break
     return array
+
 def drawStars(array, horizon):
     for i in range(20):
         ystar = random.randint(40, int(horizon.min()))
@@ -109,19 +110,27 @@ def drawStars(array, horizon):
             for y in range(4):
                 array[ystar + y][xstar + x] = [255, 255, 255]
     return array
-def drawCloud(array): 
+
+def drawCloud(array, horizon): 
 #   TODO, PERO EXTREMO TODO
     print("Drawing one single cloud")
-    cloud_data = getPoints(0.1, 0.7, 600)
-    
-    cloud_dataset = plotHorizon([cloud_data], 'cubic', length=500)[0]
-    ypos = random.randint(0, N/4)
-    xpos = random.randint(0, N)
-    for row in range(ypos, ypos + 80):
-        for column in range(xpos, xpos + len(cloud_dataset)):
-            if column < N:
-                if(row > cloud_dataset[column - xpos]):
-                    array[row][column] = [255, 255,255]
+    width = 100
+    height = 30
+    radius = 20
+    ycloud = random.randint(0, int(horizon.min()))
+    xcloud = random.randint(20, N - 20)
+    for i in range(cloud_circles):
+        ypos = random.randint(ycloud, ycloud + height)
+        xpos = random.randint(xcloud, xcloud + width)
+        for row in range(ypos - radius, ypos + radius):
+            for column in range(xpos - radius, xpos + radius):
+                if row > ycloud + 10: 
+                    continue
+                if (row > 0 and column < N and column > 0):
+                    euclidean = math.sqrt((row - ypos)**2 + (column - xpos)**2) 
+                    if euclidean <= radius:
+                        array[row][column] = [255, 255, 255]
+
     return array
                     
 def drawMountains(data, array, biome):
@@ -167,8 +176,9 @@ def generate(data, biome, time):
     
     array = drawSky(array, horizon, time)
     array = drawSun(array, horizon) if time == "day" else drawStars(array, horizon)
-    # for i in range(1):
-    #    array = drawCloud(array)
+    if time == "day":
+        for i in range(random.randint(1, 5)):
+            array = drawCloud(array, horizon)
     array = drawMountains(data, array, biome)
     if biome == "green":
         array = drawGround(array)
@@ -176,7 +186,7 @@ def generate(data, biome, time):
 
 
     image = Image.fromarray(array, "RGB")
-    image.show()
+    # image.show()
     return image
 
 def main():
@@ -191,6 +201,9 @@ def main():
     
     
     image = generate(horizons, biome[random.randint(0,1)], time[random.randint(0,1)])
+    # image = generate(horizons, "green", "day")
+    image.show()
+        
 
 if __name__ == '__main__': 
     main()
