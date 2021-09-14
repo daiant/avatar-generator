@@ -6,12 +6,16 @@ from numpy.core.numeric import outer
 from scipy.interpolate import interp1d
 from PIL import Image
 
-N = 640 
+N = 1080 
 variation = int(N*0.1)
 # FROM LOWER TO HIGHER
-sky_colors = [[132,218,243], [95,208,243], [58,193,242]]
-mountain_colors = [[94,45,12], [140,68,18], [205,101,28]]
+sky_colors = {"day": [[132,218,243], [95,208,243], [58,193,242]], 
+              "night": [[138, 74, 216], [88, 74, 216], [60, 70, 190]]}
+mountain_colors = {"desert": [[94,45,12], [140,68,18], [205,101,28]], 
+                    "green": [[17,31,36],[24,45,51], [48,90,102]]}
 sun_color = [255, 247, 176]
+ground_color = [79, 164, 71]
+earth_color = [[168, 87, 49], [146, 82, 46]]
 outer_sun = [249,255,176]
 transition_height = int(N * 0.1)
 sky_height = int(N*0.15)
@@ -29,7 +33,7 @@ def getPoints(lower, upper, pixels=N):
                 min_range = pixels*lower
                 max_range = pixels*upper
             
-            array.append(random.randrange(min_range, max_range))
+            array.append(random.randrange(int(min_range), int(max_range)))
     return array
 
 def plotHorizon(data, interpolation='slinear', length=N):
@@ -66,7 +70,7 @@ def drawSun(array, horizon):
 
     return array
 
-def drawSky(array, horizon):
+def drawSky(array, horizon, time):
     print("Drawing sky...")
     ## Generar el cielo, el bluesky
     for column in range(N): 
@@ -79,61 +83,97 @@ def drawSky(array, horizon):
             # Se pinta el cielo
             if row < horizon[column]:
                 if(row < N*0.2):
-                    colorincho = sky_colors[2]
+                    colorincho = sky_colors[time][2]
                 elif(row < N*0.3):
                     # Transicion 2 - 1
-                    colorincho = sky_colors[transition21+1]
+                    colorincho = sky_colors[time][transition21+1]
                     transition21 = abs(transition21 -1)
                 elif(row < N*0.5):
-                    colorincho = sky_colors[1]
+                    colorincho = sky_colors[time][1]
                 elif(row < N*0.6):
-                    colorincho = sky_colors[transition10]
+                    colorincho = sky_colors[time][transition10]
                     transition10 = abs(transition10 - 1)
                 else:
-                    colorincho = sky_colors[0]
+                    colorincho = sky_colors[time][0]
                 array[row][column] = colorincho
             # El horizonte no tiene por qué ser de una sola montaña, 
             # así que no tiene sentido pintarla ahora.
             else:
                 break
     return array
-
-def drawCloud(array, horizon): 
+def drawStars(array, horizon):
+    for i in range(20):
+        ystar = random.randint(40, int(horizon.min()))
+        xstar = random.randint(20, N - 20)
+        for x in range(4):
+            for y in range(4):
+                array[ystar + y][xstar + x] = [255, 255, 255]
+    return array
+def drawCloud(array): 
+#   TODO, PERO EXTREMO TODO
     print("Drawing one single cloud")
     cloud_data = getPoints(0.1, 0.7, 600)
     
-    cloud_dataset = plotHorizon([cloud_data], 'next', length=400)
+    cloud_dataset = plotHorizon([cloud_data], 'cubic', length=500)[0]
     ypos = random.randint(0, N/4)
     xpos = random.randint(0, N)
-    for row in range(80):
-        if row < N and row < horizon[row]:
-            for column in range(len(cloud_dataset[0])):
-                if column < N:
-                    xpos = int(cloud_dataset[0][column])
-                    array[row][xpos] = [255, 255,255]
+    for row in range(ypos, ypos + 80):
+        for column in range(xpos, xpos + len(cloud_dataset)):
+            if column < N:
+                if(row > cloud_dataset[column - xpos]):
+                    array[row][column] = [255, 255,255]
     return array
                     
-def drawMountains(data, array):
-    index_mountain = 0
+def drawMountains(data, array, biome):
+    index_mountain = 2
     for mountain in data:
-        print("Drawing mountain ", index_mountain , " of 3")
+        print("Drawing mountain ", index_mountain  + 1 , " of 3")
         for column in range(N):
             rowStart = mountain[column]
             for row in range(int(rowStart), N):
-                array[row][column] = mountain_colors[index_mountain]
-        index_mountain += 1
+                array[row][column] = mountain_colors[biome][index_mountain]
+        index_mountain -= 1
     return array
 
-def generate(data):
+def drawGround(array):
+    print("Drawing the soil")
+    ground = getPoints(0.05, 0.1, N)
+    ground_dataset = plotHorizon([ground], interpolation="nearest", length=N)[0]
+    
+    max_point = N - int(ground_dataset.max()) - 20
+    for column in range(N):
+        point = N - int(ground_dataset[column])          
+
+        while point > max_point:
+            array[point][column] = ground_color
+            point-=1
+        point = N - int(ground_dataset[column])
+        while point < N:
+            if point >N - ground_dataset[column] + 25:
+                colorincho = earth_color[0]
+            else:
+                colorincho = earth_color[1]
+            array[point][column] = colorincho
+            point+=1
+    return array
+
+def generate(data, biome, time):
     print("Generating image...")
+    print("Biome: ", biome)
+    print("Time: ", time)
     horizon = data.min(axis=0)
     array = np.zeros([N, N, 3], dtype=np.uint8)
     array[:,:] = [255, 255, 255]
     
-    array = drawSky(array, horizon)
-    array = drawSun(array, horizon)
-    drawCloud(array, horizon)
-    array = drawMountains(data, array)
+    array = drawSky(array, horizon, time)
+    array = drawSun(array, horizon) if time == "day" else drawStars(array, horizon)
+    # for i in range(1):
+    #    array = drawCloud(array)
+    array = drawMountains(data, array, biome)
+    if biome == "green":
+        array = drawGround(array)
+    
+
 
     image = Image.fromarray(array, "RGB")
     image.show()
@@ -141,15 +181,16 @@ def generate(data):
 
 def main():
     data = []
+    biome = ["desert", "green"]
+    time = ["night", "day"]
     print("Generating plots for mountains:")
-    for i in range(random.randint(1, 3)):
-        print(i, " of 3")
+    for i in range(3):
         data.append(getPoints( 0.3 + 0.15* i, 0.9, N))
 
     horizons = plotHorizon(data)
     
     
-    image = generate(horizons)
+    image = generate(horizons, biome[random.randint(0,1)], time[random.randint(0,1)])
 
 if __name__ == '__main__': 
     main()
