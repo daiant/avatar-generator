@@ -41,6 +41,25 @@ const saveFile = () => {
     out.on('finish', () => console.log('PNG file created'))
 }
 
+const drawGround = (grass, dirt, dirt2) => {
+    var ypos = parseInt(N*0.9)
+    var xpos = 0;
+    var width = N/100;
+    for(var rect = 0; rect <= 100; rect++) {
+        ctx.fillStyle = grass;
+        var height = Math.floor(Math.random() * (30 - 25) + 25)
+        ctx.fillRect(xpos, ypos, width +1, height)
+        ctx.fillStyle = dirt;
+        ctx.fillRect(xpos, ypos + height, width +1, 20)
+        ctx.fillStyle = dirt2;
+        ctx.fillRect(xpos, ypos + height + 20, width +1, N - ypos - height - 20)
+        
+
+        xpos += width
+    }
+
+}
+
 const drawMountain = (array, color) =>  {
 
     ctx.fillStyle = color
@@ -152,8 +171,9 @@ const draw = (biome, time) => {
     ctx.fillStyle = '#fff'
     ctx.fillRect(0, 0, width, height)
     drawSky(sky_colors[time])
+    drawSun() 
+
     if(time=="day"){ 
-        drawSun() 
         ctx.globalAlpha = 0.8
         for (var i = 0; i < Math.floor(Math.random() * (7)); i++) {
             drawCloud(20)
@@ -171,6 +191,8 @@ const draw = (biome, time) => {
         drawMountain(array, color)
         bound += 0.15
     }
+
+    drawGround('#4FA447', '#92522E', '#A85731')
     
 
     
